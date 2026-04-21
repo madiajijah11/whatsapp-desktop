@@ -7,7 +7,7 @@ use tauri::{
 
 fn send_notification(title: &str, body: &str) {
     let _ = Command::new("notify-send")
-        .args(["-t", "8000", "-i", "whatsapp", title, body])
+        .args(["-a", "WhatsApp", "-t", "8000", "-i", "whatsapp", title, body])
         .spawn();
 }
 
@@ -52,7 +52,7 @@ const WHATSAPP_BRIDGE: &str = r#"
             lastTitle = t;
             var match = t.match(/\((\d+)\)/);
             if (match) {
-                notifyRust('WhatsApp', match[1] + ' pesan belum dibaca');
+                notifyRust('WhatsApp', match[1] + ' unread messages');
             } else if (t.indexOf('WhatsApp') === -1 && t.length > 2) {
                 notifyRust('WhatsApp', t);
             }
@@ -67,8 +67,8 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             // System Tray
-            let open_item = MenuItem::with_id(app, "open", "Buka WhatsApp", true, None::<&str>)?;
-            let quit_item = MenuItem::with_id(app, "quit", "Keluar", true, None::<&str>)?;
+            let open_item = MenuItem::with_id(app, "open", "Open WhatsApp", true, None::<&str>)?;
+            let quit_item = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&open_item, &quit_item])?;
 
             let _tray = TrayIconBuilder::new()
