@@ -12,9 +12,9 @@ Lightweight desktop app that wraps [web.whatsapp.com](https://web.whatsapp.com) 
 
 - **Native Linux app** — GTK3/WebKitGTK based, no Electron overhead
 - **System tray** — Minimize to tray, stays running in background
-- **Native notifications** — Desktop notifications for incoming messages
-- **External links** — Opens links in your default browser, not inside the app
-- **Auto-start on boot** — Can be configured to start with your desktop session
+- **Native notifications** — Desktop notifications for incoming messages via `notify-send`
+- **External links** — Opens links in your default browser
+- **Notification bridge** — JavaScript bridge intercepts WhatsApp Web notifications and forwards to native desktop
 
 ## Requirements
 
@@ -58,7 +58,7 @@ For other desktop environments (KDE, XFCE, etc.) system tray works out of the bo
 Download the `.rpm` package from [Releases](../../releases) and install:
 
 ```bash
-sudo rpm -i WhatsApp_Desktop-1.0.0-1.x86_64.rpm
+sudo rpm -i whatsapp-desktop-1.0.0-1.x86_64.rpm
 ```
 
 ### From DEB (Ubuntu / Debian)
@@ -66,7 +66,7 @@ sudo rpm -i WhatsApp_Desktop-1.0.0-1.x86_64.rpm
 Download the `.deb` package from [Releases](../../releases) and install:
 
 ```bash
-sudo dpkg -i WhatsApp_Desktop_1.0.0_amd64.deb
+sudo dpkg -i whatsapp-desktop_1.0.0_amd64.deb
 ```
 
 ### From Source
@@ -99,24 +99,28 @@ whatsapp-desktop
 
 | Action | Behavior |
 |--------|----------|
-| Click **X** (close) | Window hides to tray, app keeps running |
+| Click **X** (close) | Window minimizes to tray, app keeps running |
 | **Right-click** tray icon | Menu: Buka WhatsApp / Keluar |
 | Click **Keluar** | Fully exits the application |
 
 ### Notifications
 
-Notifications are automatically bridged from WhatsApp Web to native desktop notifications. They work even when the window is hidden to tray.
+Notifications work via a JavaScript bridge that:
+1. Overrides WhatsApp Web's `Notification` API
+2. Monitors page title for unread message counts
+3. Forwards notifications to native Linux desktop via `notify-send`
+
+Notifications are debounced (min 3 seconds between notifications) to prevent spam.
 
 ## How It Works
 
-This app is a lightweight wrapper around WhatsApp Web:
-
-1. **Tauri v2** creates a native WebKitGTK window
-2. The window loads `https://web.whatsapp.com`
-3. A JavaScript bridge intercepts WhatsApp's Notification API and forwards them to native Linux notifications via the Tauri notification plugin
+1. **Tauri v2** creates a native WebKitGTK window that loads `https://web.whatsapp.com`
+2. A JavaScript bridge is injected into the page via `eval()`, which:
+   - Overrides the browser `Notification` API
+   - Monitors `document.title` for unread count changes (e.g., "(3) WhatsApp")
+   - Calls a custom Tauri command (`notify`) via `window.__TAURI__.core.invoke()`
+3. The Rust `notify` command runs `notify-send` to display native Linux notifications
 4. External links are intercepted and opened in the default system browser
-
-The app itself does not store messages or modify WhatsApp's behavior — it simply provides a native desktop experience for the existing web client.
 
 ## Tech Stack
 
@@ -125,9 +129,9 @@ The app itself does not store messages or modify WhatsApp's behavior — it simp
 | Backend | Rust + Tauri v2 |
 | Frontend | web.whatsapp.com (loaded directly) |
 | Web Engine | WebKitGTK 4.1 |
-| Notifications | tauri-plugin-notification + notify-rust |
+| Notifications | notify-send (via JS bridge + Tauri IPC) |
 | System Tray | libayatana-appindicator |
-| Bundler | Tauri bundler (RPM, DEB, AppImage) |
+| Bundler | Tauri bundler (RPM, DEB) |
 
 ## Project Structure
 
@@ -136,14 +140,15 @@ whatsapp-desktop/
 ├── src-tauri/
 │   ├── src/
 │   │   ├── main.rs          # Entry point
-│   │   └── lib.rs           # App setup, tray, notifications
+│   │   └── lib.rs           # App setup, tray, notification bridge
 │   ├── icons/               # App icons
 │   ├── capabilities/
 │   │   └── default.json     # Tauri permissions
 │   ├── tauri.conf.json      # Tauri configuration
 │   └── Cargo.toml           # Rust dependencies
 ├── dist/                    # Minimal frontend (fallback)
-└── package.json
+├── LICENSE                  # MIT License
+└── README.md
 ```
 
 ## License
