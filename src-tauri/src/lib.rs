@@ -109,12 +109,6 @@ pub fn run() {
                 }
             });
 
-            // Ready notification
-            std::thread::spawn(|| {
-                std::thread::sleep(std::time::Duration::from_secs(2));
-                send_notification("WhatsApp Desktop", "Siap digunakan!");
-            });
-
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![notify])
