@@ -220,7 +220,19 @@ pub fn run() {
                 })
                 .build(app)?;
 
-            let window = app.get_webview_window("main").unwrap();
+            let window = tauri::WebviewWindowBuilder::new(
+                app,
+                "main",
+                tauri::WebviewUrl::External("https://web.whatsapp.com".parse().unwrap()),
+            )
+            .title("WhatsApp")
+            .inner_size(1200.0, 800.0)
+            .min_inner_size(800.0, 600.0)
+            .resizable(true)
+            .center()
+            .user_agent("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36")
+            .initialization_script(WHATSAPP_BRIDGE)
+            .build()?;
 
             // Close to Tray
             let window_clone = window.clone();
@@ -228,16 +240,6 @@ pub fn run() {
                 if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                     api.prevent_close();
                     let _ = window_clone.minimize();
-                }
-            });
-
-            // Inject notification bridge into WhatsApp Web periodically
-            let w = window.clone();
-            std::thread::spawn(move || {
-                std::thread::sleep(std::time::Duration::from_secs(10));
-                loop {
-                    let _ = w.eval(WHATSAPP_BRIDGE);
-                    std::thread::sleep(std::time::Duration::from_secs(5));
                 }
             });
 
