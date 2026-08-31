@@ -3,6 +3,9 @@
   "identifier": "default",
   "description": "Capability for the main window",
   "windows": ["main"],
+  "remote": {
+    "urls": ["https://web.whatsapp.com/*", "https://*.whatsapp.com/*"]
+  },
   "permissions": [
     "core:default",
     "core:webview:default",

@@ -18,12 +18,10 @@
         "minHeight": 600,
         "resizable": true,
         "center": true,
-        "url": "https://web.whatsapp.com"
+        "url": "https://web.whatsapp.com",
+        "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36"
       }
-    ],
-    "security": {
-      "csp": "default-src 'self' https://web.whatsapp.com https://*.whatsapp.com https://*.whatsapp.net https://*.facebook.com https://*.fbcdn.net https://*.fb.com 'unsafe-inline' 'unsafe-eval' blob: data: ws: wss:;"
-    }
+    ]
   },
   "bundle": {
     "active": true,
