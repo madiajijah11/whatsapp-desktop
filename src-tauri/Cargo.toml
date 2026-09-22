@@ -1,6 +1,6 @@
 [package]
 name = "whatsapp-desktop"
-version = "0.1.0"
+version = "1.0.1"
 description = "Native WhatsApp Web wrapper for Linux"
 authors = ["madiajijah11"]
 edition = "2021"

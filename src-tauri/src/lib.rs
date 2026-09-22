@@ -8,9 +8,13 @@ use tauri::{
 };
 
 fn send_notification(title: &str, body: &str) {
-    let _ = Command::new("notify-send")
-        .args(["-a", "WhatsApp", "-t", "8000", "-i", "whatsapp", title, body])
-        .spawn();
+    let title = title.to_string();
+    let body = body.to_string();
+    std::thread::spawn(move || {
+        let _ = Command::new("notify-send")
+            .args(["-a", "WhatsApp", "-t", "8000", "-i", "whatsapp", &title, &body])
+            .status();
+    });
 }
 
 #[tauri::command]
@@ -234,12 +238,31 @@ pub fn run() {
             .initialization_script(WHATSAPP_BRIDGE)
             .build()?;
 
-            // Close to Tray
+            // Close to Tray & Trim Memory
             let window_clone = window.clone();
             window.on_window_event(move |event| {
                 if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                     api.prevent_close();
                     let _ = window_clone.minimize();
+                    #[cfg(target_os = "linux")]
+                    unsafe {
+                        extern "C" {
+                            fn malloc_trim(pad: usize) -> i32;
+                        }
+                        malloc_trim(0);
+                    }
+                }
+            });
+
+            // Periodic memory trimming on Linux
+            #[cfg(target_os = "linux")]
+            std::thread::spawn(|| loop {
+                std::thread::sleep(std::time::Duration::from_secs(300));
+                unsafe {
+                    extern "C" {
+                        fn malloc_trim(pad: usize) -> i32;
+                    }
+                    malloc_trim(0);
                 }
             });
 
