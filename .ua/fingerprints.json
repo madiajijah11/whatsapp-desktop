@@ -1,0 +1,46 @@
+{
+  "gitCommitHash": "0a9d1770b2e3cf32054820ff30c2db8478274e53",
+  "createdAt": "2026-09-23T16:25:00.000Z",
+  "fingerprints": {
+    "README.md": {
+      "hash": "bc8f36a2d98068358272a745956e075f8f61bb08a4ddf25b178bfc61d94322df",
+      "size": 4435
+    },
+    "package.json": {
+      "hash": "f596bda47b84cddcaabd74294b4efb296ec32a67a7b4ceeec9e66c632ce4176d",
+      "size": 191
+    },
+    "src-tauri/Cargo.toml": {
+      "hash": "d24fb7467a19d8c9ef2eafa32193165cf32137a263950ca2dde48cb0d816244c",
+      "size": 976
+    },
+    "src-tauri/tauri.conf.json": {
+      "hash": "0a69b774e659a5b01e21e866d0942f8c15c882c0b0c1a83e41d3ef9a7728e855",
+      "size": 482
+    },
+    "src-tauri/capabilities/default.json": {
+      "hash": "a02575499e4743e55c793d22c89237eb37cff5e8d361c951adcba63c6c3c92da",
+      "size": 363
+    },
+    "src-tauri/build.rs": {
+      "hash": "487059eaf8a947b80f20a9aacac038a5047b2ad69d2401b827376c67d6fe847f",
+      "size": 39
+    },
+    "src-tauri/src/main.rs": {
+      "hash": "fa551f9a3e4888c6a9fb6a218922cb00032c2d90115e53d1449f2542adc26042",
+      "size": 358
+    },
+    "src-tauri/src/lib.rs": {
+      "hash": "77a703faef1fbe95b383ce14e58ee2940ff31ad162701bd5733af45811bfa731",
+      "size": 10557
+    },
+    "dist/index.html": {
+      "hash": "a7b5c955213b2de21a846d5463200ce881dbb6c8c670bb34bd3780e3b56dad2f",
+      "size": 1983
+    },
+    "LICENSE": {
+      "hash": "1126322e2cc8d165adc4c792eeb195717de2bcc7b39be1ce77959d78e87ef685",
+      "size": 1056
+    }
+  }
+}

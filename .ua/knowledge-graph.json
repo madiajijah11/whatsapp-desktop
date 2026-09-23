@@ -1,0 +1,382 @@
+{
+  "version": "1.0.0",
+  "project": {
+    "name": "whatsapp-desktop",
+    "languages": ["Rust", "JavaScript", "HTML", "JSON", "TOML"],
+    "frameworks": ["Tauri v2", "WebKitGTK"],
+    "description": "Native WhatsApp Web wrapper for Linux built with Rust and Tauri v2, featuring system tray integration, native notifications via notify-send, and memory optimization.",
+    "analyzedAt": "2026-09-23T16:20:00.000Z",
+    "gitCommitHash": "0a9d1770b2e3cf32054820ff30c2db8478274e53"
+  },
+  "nodes": [
+    {
+      "id": "file:src-tauri/src/main.rs",
+      "type": "file",
+      "name": "main.rs",
+      "filePath": "src-tauri/src/main.rs",
+      "summary": "Application binary entrypoint configuring Linux glibc memory thresholds (MALLOC_TRIM_THRESHOLD_, MALLOC_ARENA_MAX) and invoking whatsapp_desktop_lib::run.",
+      "tags": ["rust", "entrypoint", "memory-tuning", "tauri"]
+    },
+    {
+      "id": "function:src-tauri/src/main.rs:main",
+      "type": "function",
+      "name": "main",
+      "filePath": "src-tauri/src/main.rs",
+      "summary": "Main function setting memory optimization environment variables and launching the desktop runtime.",
+      "tags": ["rust", "function", "entrypoint"]
+    },
+    {
+      "id": "file:src-tauri/src/lib.rs",
+      "type": "file",
+      "name": "lib.rs",
+      "filePath": "src-tauri/src/lib.rs",
+      "summary": "Core application library implementing WebviewWindow setup, WHATSAPP_BRIDGE JavaScript injection, system tray menu, native notification daemon calls, and clipboard helpers.",
+      "tags": ["rust", "webview", "tray", "clipboard", "notification"]
+    },
+    {
+      "id": "function:src-tauri/src/lib.rs:run",
+      "type": "function",
+      "name": "run",
+      "filePath": "src-tauri/src/lib.rs",
+      "summary": "Bootstraps Tauri v2 app, registers tray icon, constructs the main webview loading web.whatsapp.com, attaches close-to-tray listener, and starts background memory trim thread.",
+      "tags": ["rust", "tauri", "lifecycle", "window"]
+    },
+    {
+      "id": "function:src-tauri/src/lib.rs:send_notification",
+      "type": "function",
+      "name": "send_notification",
+      "filePath": "src-tauri/src/lib.rs",
+      "summary": "Spawns a detached worker thread executing Linux notify-send with WhatsApp icon and custom timeout.",
+      "tags": ["rust", "notification", "linux", "desktop"]
+    },
+    {
+      "id": "function:src-tauri/src/lib.rs:notify",
+      "type": "function",
+      "name": "notify",
+      "filePath": "src-tauri/src/lib.rs",
+      "summary": "Tauri IPC command exposed to webview frontend and bridge script to trigger desktop notifications.",
+      "tags": ["rust", "ipc", "command"]
+    },
+    {
+      "id": "function:src-tauri/src/lib.rs:clipboard_read_text",
+      "type": "function",
+      "name": "clipboard_read_text",
+      "filePath": "src-tauri/src/lib.rs",
+      "summary": "Tauri IPC command reading plain text from system clipboard using arboard.",
+      "tags": ["rust", "clipboard", "ipc"]
+    },
+    {
+      "id": "function:src-tauri/src/lib.rs:clipboard_has_image",
+      "type": "function",
+      "name": "clipboard_has_image",
+      "filePath": "src-tauri/src/lib.rs",
+      "summary": "Tauri IPC command checking if clipboard contains bitmap image data.",
+      "tags": ["rust", "clipboard", "ipc"]
+    },
+    {
+      "id": "function:src-tauri/src/lib.rs:clipboard_read_image_base64",
+      "type": "function",
+      "name": "clipboard_read_image_base64",
+      "filePath": "src-tauri/src/lib.rs",
+      "summary": "Tauri IPC command extracting raw image data from clipboard, encoding it into PNG format, and returning base64 data URI.",
+      "tags": ["rust", "clipboard", "image", "png"]
+    },
+    {
+      "id": "file:src-tauri/build.rs",
+      "type": "file",
+      "name": "build.rs",
+      "filePath": "src-tauri/build.rs",
+      "summary": "Cargo build script invoking tauri_build::build to compile Tauri resources and bindings.",
+      "tags": ["rust", "build"]
+    },
+    {
+      "id": "function:src-tauri/build.rs:main",
+      "type": "function",
+      "name": "main",
+      "filePath": "src-tauri/build.rs",
+      "summary": "Executes tauri_build::build during compilation.",
+      "tags": ["rust", "build"]
+    },
+    {
+      "id": "config:src-tauri/Cargo.toml",
+      "type": "config",
+      "name": "Cargo.toml",
+      "filePath": "src-tauri/Cargo.toml",
+      "summary": "Rust package manifest defining crate metadata and dependencies on tauri, arboard, image, and serde.",
+      "tags": ["toml", "cargo", "dependencies"]
+    },
+    {
+      "id": "config:src-tauri/tauri.conf.json",
+      "type": "config",
+      "name": "tauri.conf.json",
+      "filePath": "src-tauri/tauri.conf.json",
+      "summary": "Tauri v2 configuration file specifying application metadata, bundle targets, icons, and frontend distribution directory.",
+      "tags": ["json", "tauri", "config"]
+    },
+    {
+      "id": "config:src-tauri/capabilities/default.json",
+      "type": "config",
+      "name": "default.json",
+      "filePath": "src-tauri/capabilities/default.json",
+      "summary": "Tauri v2 ACL capability configuration granting web.whatsapp.com remote origin permissions for core webview, tray, and opener.",
+      "tags": ["json", "security", "acl", "tauri"]
+    },
+    {
+      "id": "config:package.json",
+      "type": "config",
+      "name": "package.json",
+      "filePath": "package.json",
+      "summary": "Node project manifest providing CLI script bindings for @tauri-apps/cli.",
+      "tags": ["json", "npm", "cli"]
+    },
+    {
+      "id": "file:dist/index.html",
+      "type": "file",
+      "name": "index.html",
+      "filePath": "dist/index.html",
+      "summary": "Diagnostic HTML interface with UI button and logging area for testing Tauri IPC notification commands.",
+      "tags": ["html", "frontend", "testing"]
+    },
+    {
+      "id": "document:README.md",
+      "type": "document",
+      "name": "README.md",
+      "filePath": "README.md",
+      "summary": "Comprehensive project documentation covering Linux desktop features, WebKitGTK rationale, system tray setup, and installation steps.",
+      "tags": ["markdown", "documentation"]
+    },
+    {
+      "id": "document:LICENSE",
+      "type": "document",
+      "name": "LICENSE",
+      "filePath": "LICENSE",
+      "summary": "MIT open source license terms.",
+      "tags": ["legal", "license"]
+    },
+    {
+      "id": "concept:whatsapp-bridge",
+      "type": "concept",
+      "name": "WhatsApp Bridge",
+      "summary": "Injected JavaScript layer overriding window.Notification, polling page title for unread counters, and bridging clipboard image paste into WhatsApp input via synthetic drop events.",
+      "tags": ["concept", "bridge", "webkit", "paste-fix"]
+    },
+    {
+      "id": "concept:memory-optimization",
+      "type": "concept",
+      "name": "Linux Memory Optimization",
+      "summary": "Multi-tier memory management using glibc MALLOC_TRIM_THRESHOLD_, MALLOC_ARENA_MAX, and periodic malloc_trim calls to control WebKitGTK memory growth.",
+      "tags": ["concept", "linux", "memory", "glibc"]
+    },
+    {
+      "id": "concept:system-tray",
+      "type": "concept",
+      "name": "System Tray Integration",
+      "summary": "Native desktop tray menu handling minimize-to-tray on close request and restore on click.",
+      "tags": ["concept", "tray", "gtk", "ux"]
+    }
+  ],
+  "edges": [
+    {
+      "source": "file:src-tauri/src/main.rs",
+      "target": "function:src-tauri/src/main.rs:main",
+      "type": "contains"
+    },
+    {
+      "source": "function:src-tauri/src/main.rs:main",
+      "target": "function:src-tauri/src/lib.rs:run",
+      "type": "calls"
+    },
+    {
+      "source": "function:src-tauri/src/main.rs:main",
+      "target": "concept:memory-optimization",
+      "type": "related"
+    },
+    {
+      "source": "file:src-tauri/src/lib.rs",
+      "target": "function:src-tauri/src/lib.rs:run",
+      "type": "contains"
+    },
+    {
+      "source": "file:src-tauri/src/lib.rs",
+      "target": "function:src-tauri/src/lib.rs:send_notification",
+      "type": "contains"
+    },
+    {
+      "source": "file:src-tauri/src/lib.rs",
+      "target": "function:src-tauri/src/lib.rs:notify",
+      "type": "contains"
+    },
+    {
+      "source": "file:src-tauri/src/lib.rs",
+      "target": "function:src-tauri/src/lib.rs:clipboard_read_text",
+      "type": "contains"
+    },
+    {
+      "source": "file:src-tauri/src/lib.rs",
+      "target": "function:src-tauri/src/lib.rs:clipboard_has_image",
+      "type": "contains"
+    },
+    {
+      "source": "file:src-tauri/src/lib.rs",
+      "target": "function:src-tauri/src/lib.rs:clipboard_read_image_base64",
+      "type": "contains"
+    },
+    {
+      "source": "function:src-tauri/src/lib.rs:notify",
+      "target": "function:src-tauri/src/lib.rs:send_notification",
+      "type": "calls"
+    },
+    {
+      "source": "function:src-tauri/src/lib.rs:run",
+      "target": "concept:whatsapp-bridge",
+      "type": "related"
+    },
+    {
+      "source": "function:src-tauri/src/lib.rs:run",
+      "target": "concept:system-tray",
+      "type": "related"
+    },
+    {
+      "source": "function:src-tauri/src/lib.rs:run",
+      "target": "concept:memory-optimization",
+      "type": "related"
+    },
+    {
+      "source": "concept:whatsapp-bridge",
+      "target": "function:src-tauri/src/lib.rs:notify",
+      "type": "calls"
+    },
+    {
+      "source": "concept:whatsapp-bridge",
+      "target": "function:src-tauri/src/lib.rs:clipboard_read_image_base64",
+      "type": "calls"
+    },
+    {
+      "source": "concept:whatsapp-bridge",
+      "target": "function:src-tauri/src/lib.rs:clipboard_read_text",
+      "type": "calls"
+    },
+    {
+      "source": "file:src-tauri/build.rs",
+      "target": "function:src-tauri/build.rs:main",
+      "type": "contains"
+    },
+    {
+      "source": "config:src-tauri/Cargo.toml",
+      "target": "file:src-tauri/src/lib.rs",
+      "type": "configures"
+    },
+    {
+      "source": "config:src-tauri/Cargo.toml",
+      "target": "file:src-tauri/src/main.rs",
+      "type": "configures"
+    },
+    {
+      "source": "config:src-tauri/tauri.conf.json",
+      "target": "file:src-tauri/src/lib.rs",
+      "type": "configures"
+    },
+    {
+      "source": "config:src-tauri/capabilities/default.json",
+      "target": "config:src-tauri/tauri.conf.json",
+      "type": "configures"
+    },
+    {
+      "source": "config:package.json",
+      "target": "config:src-tauri/tauri.conf.json",
+      "type": "configures"
+    },
+    {
+      "source": "file:dist/index.html",
+      "target": "function:src-tauri/src/lib.rs:notify",
+      "type": "calls"
+    },
+    {
+      "source": "document:README.md",
+      "target": "file:src-tauri/src/main.rs",
+      "type": "documents"
+    },
+    {
+      "source": "document:README.md",
+      "target": "file:src-tauri/src/lib.rs",
+      "type": "documents"
+    },
+    {
+      "source": "document:LICENSE",
+      "target": "document:README.md",
+      "type": "related"
+    }
+  ],
+  "layers": [
+    {
+      "id": "layer:application-core",
+      "name": "Application Core & Runtime",
+      "description": "Tauri v2 application entrypoint, Webview lifecycle, system tray integration, and native Linux bridge",
+      "nodeIds": [
+        "file:src-tauri/src/main.rs",
+        "file:src-tauri/src/lib.rs",
+        "file:src-tauri/build.rs"
+      ]
+    },
+    {
+      "id": "layer:configuration-permissions",
+      "name": "Configuration & Capabilities",
+      "description": "Build manifests, Tauri v2 app configuration, remote URL capabilities, and package definitions",
+      "nodeIds": [
+        "config:src-tauri/Cargo.toml",
+        "config:src-tauri/tauri.conf.json",
+        "config:src-tauri/capabilities/default.json",
+        "config:package.json"
+      ]
+    },
+    {
+      "id": "layer:frontend-interface",
+      "name": "Frontend & Fallback UI",
+      "description": "Static web frontend and diagnostic IPC test harness",
+      "nodeIds": [
+        "file:dist/index.html"
+      ]
+    },
+    {
+      "id": "layer:documentation",
+      "name": "Documentation & Metadata",
+      "description": "Project documentation, architecture details, and licensing",
+      "nodeIds": [
+        "document:README.md",
+        "document:LICENSE"
+      ]
+    }
+  ],
+  "tour": [
+    {
+      "order": 1,
+      "title": "Project Architecture & Overview",
+      "description": "High-level overview of WhatsApp Desktop, explaining why Tauri v2 + WebKitGTK is chosen over Electron for Linux desktop integration.",
+      "nodeIds": ["document:README.md"]
+    },
+    {
+      "order": 2,
+      "title": "Process Entry & Memory Tuning",
+      "description": "Initialization entry point setting glibc malloc arenas and trim thresholds before delegating to lib runtime.",
+      "nodeIds": ["file:src-tauri/src/main.rs"]
+    },
+    {
+      "order": 3,
+      "title": "Core Runtime & WhatsApp Bridge",
+      "description": "WebviewWindow creation loading web.whatsapp.com, injecting JavaScript bridge for notifications & clipboard, tray management, and native notify-send.",
+      "nodeIds": ["file:src-tauri/src/lib.rs"]
+    },
+    {
+      "order": 4,
+      "title": "Tauri Configuration & Security Capabilities",
+      "description": "Tauri v2 configuration and ACL permissions granting web.whatsapp.com access to tray, webview, and IPC commands.",
+      "nodeIds": ["config:src-tauri/tauri.conf.json", "config:src-tauri/capabilities/default.json"]
+    },
+    {
+      "order": 5,
+      "title": "Frontend Test Harness",
+      "description": "Local diagnostic page used to verify Tauri IPC notification delivery and bridge status.",
+      "nodeIds": ["file:dist/index.html"]
+    }
+  ]
+}
