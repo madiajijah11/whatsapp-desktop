@@ -1,0 +1,749 @@
+{
+  "version": "1.0.0",
+  "project": {
+    "name": "whatsapp-desktop",
+    "languages": ["Rust", "JavaScript", "HTML", "JSON", "TOML"],
+    "frameworks": ["Tauri v2", "WebKitGTK"],
+    "description": "Native WhatsApp Web wrapper for Linux built with Rust and Tauri v2",
+    "analyzedAt": "2026-09-23T16:40:00.000Z",
+    "gitCommitHash": "0a9d1770b2e3cf32054820ff30c2db8478274e53"
+  },
+  "nodes": [
+    {
+      "id": "domain:desktop-lifecycle",
+      "type": "domain",
+      "name": "Desktop Lifecycle & Memory Optimization",
+      "summary": "Governs the native Linux process lifecycle, system tray integration, window event interception, and glibc memory optimizations to keep memory footprint under control.",
+      "tags": ["domain", "desktop", "lifecycle", "memory", "gtk"],
+      "complexity": "moderate",
+      "domainMeta": {
+        "entities": [
+          "Application Window",
+          "System Tray Menu",
+          "Gtk Event Loop",
+          "Glibc Heap Arena"
+        ],
+        "businessRules": [
+          "Window close requests (Alt+F4 or close button) must be intercepted and minimized to tray instead of quitting.",
+          "Glibc memory allocations must be bounded by setting MALLOC_TRIM_THRESHOLD_=131072 and MALLOC_ARENA_MAX=2 before GTK initialization.",
+          "Periodic background memory trimming (malloc_trim(0)) runs every 300 seconds to release unmapped pages back to Linux kernel.",
+          "Immediate malloc_trim(0) is executed when the user minimizes the window to tray.",
+          "System tray provides 'Open' (restore & focus) and 'Quit' (clean process termination)."
+        ],
+        "crossDomainInteractions": [
+          "Provides runtime host and Webview container for WhatsApp Web bridge",
+          "Coordinates process background state with notification dispatching",
+          "Reclaims memory spikes caused by clipboard image decoding"
+        ]
+      }
+    },
+    {
+      "id": "domain:notifications",
+      "type": "domain",
+      "name": "Message Notification & Unread Alerts",
+      "summary": "Bridges web notification events and document title changes from WhatsApp Web into native Linux desktop notifications via notify-send daemon.",
+      "tags": ["domain", "notification", "linux", "alerting"],
+      "complexity": "moderate",
+      "domainMeta": {
+        "entities": [
+          "Web Notification Payload",
+          "Title Unread Counter",
+          "Debounce Key Cache",
+          "NotifySend Subprocess"
+        ],
+        "businessRules": [
+          "Intercept standard browser window.Notification API and route to Rust notify IPC command.",
+          "Debounce notifications: drop duplicate title:body alerts within 10 seconds and enforce minimum 3-second spacing between any alerts.",
+          "Poll document.title every 2 seconds for badge pattern '(N)' as an unread message fallback.",
+          "Invoke Linux notify-send asynchronously in a detached OS thread with WhatsApp icon and 8000ms duration."
+        ],
+        "crossDomainInteractions": [
+          "Triggered by WhatsApp Web JavaScript bridge injected into Webview",
+          "Restricted to permitted remote origin via Tauri ACL capability",
+          "Sends desktop alerts while application is minimized to system tray"
+        ]
+      }
+    },
+    {
+      "id": "domain:clipboard-media",
+      "type": "domain",
+      "name": "Clipboard & Rich Media Integration",
+      "summary": "Overcomes WebKitGTK Linux limitation where async clipboard APIs do not support image data, providing seamless text and image paste into WhatsApp chat input.",
+      "tags": ["domain", "clipboard", "image", "webkit", "paste-fix"],
+      "complexity": "complex",
+      "domainMeta": {
+        "entities": [
+          "System Clipboard (arboard)",
+          "Raw RGBA Bitmap",
+          "PNG Byte Stream",
+          "Base64 Data URI",
+          "Synthetic DragEvent",
+          "Message Input Element"
+        ],
+        "businessRules": [
+          "WebKitGTK does not expose image formats through navigator.clipboard.read() or standard paste events.",
+          "Capture-phase paste listener intercepts Ctrl+V, checks for clipboard image via Rust native arboard, and suppresses default browser paste if image exists.",
+          "Rust backend reads raw RGBA buffer, encodes as PNG in-memory, and returns Base64 data URI to Webview.",
+          "Frontend constructs a File object and dispatches a synthetic DragEvent('drop') to the WhatsApp contenteditable editor to trigger image upload.",
+          "Fallback strategy writes File back into DataTransfer if drop event is unhandled.",
+          "Override navigator.clipboard.read() so UI 'Paste' button falls back to Rust clipboard helper."
+        ],
+        "crossDomainInteractions": [
+          "Exposes custom Tauri IPC commands protected by security capabilities",
+          "Generates in-memory PNG buffers that are cleaned up by glibc malloc trimming"
+        ]
+      }
+    },
+    {
+      "id": "domain:security-capabilities",
+      "type": "domain",
+      "name": "Security Boundaries & Tauri ACL",
+      "summary": "Defines access control lists and runtime capabilities, restricting remote WhatsApp origin to only necessary core webview, tray, and custom IPC commands.",
+      "tags": ["domain", "security", "acl", "tauri", "sandbox"],
+      "complexity": "simple",
+      "domainMeta": {
+        "entities": [
+          "Capability Manifest",
+          "Remote Origin Whitelist",
+          "Tauri Core Permissions",
+          "IPC Command Whitelist"
+        ],
+        "businessRules": [
+          "Only allow remote execution permissions for https://web.whatsapp.com/* and https://*.whatsapp.com/*.",
+          "Restrict accessible Tauri permissions to core:default, core:webview:default, core:tray:default, and opener:default.",
+          "Expose only explicit custom commands: notify, clipboard_read_text, clipboard_has_image, clipboard_read_image_base64.",
+          "Prevent arbitrary filesystem access, shell execution, or remote origin spoofing."
+        ],
+        "crossDomainInteractions": [
+          "Enforces capability boundaries on the WhatsApp Web bridge script",
+          "Validates IPC invocations originating from WebviewWindow"
+        ]
+      }
+    },
+    {
+      "id": "flow:boot-and-memory-setup",
+      "type": "flow",
+      "name": "Application Boot & Memory Tuning Flow",
+      "filePath": "src-tauri/src/main.rs",
+      "summary": "Initializes process environment variables, builds system tray, initializes WebviewWindow with WhatsApp bridge, and launches periodic memory trimming loop.",
+      "tags": ["flow", "initialization", "boot", "memory"],
+      "complexity": "moderate",
+      "domainMeta": {
+        "entryPoint": "src-tauri/src/main.rs:main",
+        "entryType": "cli"
+      }
+    },
+    {
+      "id": "step:set-glibc-tunables",
+      "type": "step",
+      "name": "Set glibc Memory Tunables",
+      "filePath": "src-tauri/src/main.rs",
+      "summary": "Configures MALLOC_TRIM_THRESHOLD_=131072 and MALLOC_ARENA_MAX=2 before starting Tauri and WebKitGTK runtimes.",
+      "tags": ["step", "memory", "glibc"],
+      "complexity": "simple"
+    },
+    {
+      "id": "step:build-tray-menu",
+      "type": "step",
+      "name": "Register System Tray & Handlers",
+      "filePath": "src-tauri/src/lib.rs",
+      "summary": "Builds system tray menu with Open and Quit menu items, attaching event handlers to unminimize window or terminate app.",
+      "tags": ["step", "tray", "menu"],
+      "complexity": "simple"
+    },
+    {
+      "id": "step:create-webview-window",
+      "type": "step",
+      "name": "Create Webview Loading WhatsApp",
+      "filePath": "src-tauri/src/lib.rs",
+      "summary": "Constructs WebviewWindow pointing to https://web.whatsapp.com, sets custom Chrome User-Agent, and registers WHATSAPP_BRIDGE script.",
+      "tags": ["step", "webview", "initialization"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "step:spawn-periodic-trim-thread",
+      "type": "step",
+      "name": "Spawn Background Memory Trimmer",
+      "filePath": "src-tauri/src/lib.rs",
+      "summary": "Starts a background OS thread that sleeps for 300 seconds and calls malloc_trim(0) in an infinite loop.",
+      "tags": ["step", "thread", "memory", "trim"],
+      "complexity": "simple"
+    },
+    {
+      "id": "flow:minimize-to-tray",
+      "type": "flow",
+      "name": "Minimize to Tray & Restore Flow",
+      "filePath": "src-tauri/src/lib.rs",
+      "summary": "Handles close window requests by intercepting event, hiding window to tray, running malloc_trim, and restoring on user demand.",
+      "tags": ["flow", "tray", "minimize", "restore"],
+      "complexity": "simple",
+      "domainMeta": {
+        "entryPoint": "tauri::WindowEvent::CloseRequested",
+        "entryType": "event"
+      }
+    },
+    {
+      "id": "step:intercept-close-request",
+      "type": "step",
+      "name": "Intercept Close Request",
+      "filePath": "src-tauri/src/lib.rs",
+      "summary": "Listens for WindowEvent::CloseRequested and calls api.prevent_close() to cancel window destruction.",
+      "tags": ["step", "window", "event"],
+      "complexity": "simple"
+    },
+    {
+      "id": "step:minimize-window-to-tray",
+      "type": "step",
+      "name": "Minimize Window to Tray",
+      "filePath": "src-tauri/src/lib.rs",
+      "summary": "Invokes window.minimize() to remove application from desktop taskbar while keeping background process alive.",
+      "tags": ["step", "window", "minimize"],
+      "complexity": "simple"
+    },
+    {
+      "id": "step:immediate-malloc-trim",
+      "type": "step",
+      "name": "Trigger Immediate malloc_trim",
+      "filePath": "src-tauri/src/lib.rs",
+      "summary": "Invokes libc malloc_trim(0) immediately after minimizing to free unused WebKit buffer pages.",
+      "tags": ["step", "memory", "glibc"],
+      "complexity": "simple"
+    },
+    {
+      "id": "step:restore-window-from-tray",
+      "type": "step",
+      "name": "Restore Window from Tray",
+      "filePath": "src-tauri/src/lib.rs",
+      "summary": "Handles tray 'Open' menu click by calling window.show(), window.unminimize(), and window.set_focus().",
+      "tags": ["step", "tray", "restore"],
+      "complexity": "simple"
+    },
+    {
+      "id": "flow:incoming-message-alert",
+      "type": "flow",
+      "name": "Incoming Message Alerting Flow",
+      "filePath": "src-tauri/src/lib.rs",
+      "summary": "Intercepts web Notification constructor in WhatsApp Web, applies rate-limiting debounce, and dispatches native notify-send alert.",
+      "tags": ["flow", "notification", "message", "alert"],
+      "complexity": "moderate",
+      "domainMeta": {
+        "entryPoint": "window.Notification",
+        "entryType": "event"
+      }
+    },
+    {
+      "id": "step:intercept-notification-constructor",
+      "type": "step",
+      "name": "Intercept window.Notification",
+      "filePath": "src-tauri/src/lib.rs",
+      "summary": "Replaces window.Notification with bridge function and overrides permission property to 'granted'.",
+      "tags": ["step", "javascript", "override"],
+      "complexity": "simple"
+    },
+    {
+      "id": "step:debounce-notification",
+      "type": "step",
+      "name": "Debounce & Rate-Limit Alert",
+      "filePath": "src-tauri/src/lib.rs",
+      "summary": "Checks last notify timestamp (drops <3s intervals) and compares composite key title+body (drops duplicate within 10s).",
+      "tags": ["step", "debounce", "rate-limit"],
+      "complexity": "simple"
+    },
+    {
+      "id": "step:invoke-tauri-notify-command",
+      "type": "step",
+      "name": "Invoke Tauri Notify IPC",
+      "filePath": "src-tauri/src/lib.rs",
+      "summary": "Calls window.__TAURI__.core.invoke('notify', { title, body }) to bridge message payload into Rust backend.",
+      "tags": ["step", "ipc", "bridge"],
+      "complexity": "simple"
+    },
+    {
+      "id": "step:spawn-notify-send-subprocess",
+      "type": "step",
+      "name": "Execute notify-send Subprocess",
+      "filePath": "src-tauri/src/lib.rs",
+      "summary": "Spawns detached OS worker thread executing notify-send -a WhatsApp -t 8000 -i whatsapp with message title and body.",
+      "tags": ["step", "linux", "subprocess", "notification"],
+      "complexity": "simple"
+    },
+    {
+      "id": "flow:title-unread-detection",
+      "type": "flow",
+      "name": "Document Title Unread Poller Flow",
+      "filePath": "src-tauri/src/lib.rs",
+      "summary": "Monitors WhatsApp Web tab title every 2 seconds to extract unread message badges and trigger desktop alerts.",
+      "tags": ["flow", "polling", "unread", "badge"],
+      "complexity": "simple",
+      "domainMeta": {
+        "entryPoint": "setInterval",
+        "entryType": "cron"
+      }
+    },
+    {
+      "id": "step:poll-document-title",
+      "type": "step",
+      "name": "Poll Document Title Interval",
+      "filePath": "src-tauri/src/lib.rs",
+      "summary": "Checks document.title every 2000ms and filters out repeated title states.",
+      "tags": ["step", "polling", "dom"],
+      "complexity": "simple"
+    },
+    {
+      "id": "step:regex-extract-unread-count",
+      "type": "step",
+      "name": "Extract Unread Count via Regex",
+      "filePath": "src-tauri/src/lib.rs",
+      "summary": "Applies /\\((\\d+)\\)/ regex to title string to capture message count or detect contact name title format.",
+      "tags": ["step", "regex", "parsing"],
+      "complexity": "simple"
+    },
+    {
+      "id": "step:trigger-badge-alert",
+      "type": "step",
+      "name": "Trigger Badge Desktop Notification",
+      "filePath": "src-tauri/src/lib.rs",
+      "summary": "Dispatches unread count alert to notifyRust helper for debounced delivery.",
+      "tags": ["step", "notification", "dispatch"],
+      "complexity": "simple"
+    },
+    {
+      "id": "flow:image-paste-bridge",
+      "type": "flow",
+      "name": "Image Paste & Synthetic Drop Bridge Flow",
+      "filePath": "src-tauri/src/lib.rs",
+      "summary": "Intercepts Ctrl+V paste events, extracts raw clipboard bitmap via arboard, encodes PNG, and drops File object into chat editor.",
+      "tags": ["flow", "clipboard", "image", "drop"],
+      "complexity": "complex",
+      "domainMeta": {
+        "entryPoint": "document.addEventListener('paste', capture)",
+        "entryType": "event"
+      }
+    },
+    {
+      "id": "step:intercept-paste-capture",
+      "type": "step",
+      "name": "Capture Paste Event",
+      "filePath": "src-tauri/src/lib.rs",
+      "summary": "Attaches capture-phase listener on document paste event, halting immediate propagation when native clipboard holds image data.",
+      "tags": ["step", "paste", "event-capture"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "step:query-native-clipboard-image",
+      "type": "step",
+      "name": "Check Clipboard Image State",
+      "filePath": "src-tauri/src/lib.rs",
+      "summary": "Invokes clipboard_has_image IPC command to check whether arboard can read a valid image from system clipboard.",
+      "tags": ["step", "clipboard", "query"],
+      "complexity": "simple"
+    },
+    {
+      "id": "step:encode-png-in-memory",
+      "type": "step",
+      "name": "Encode Raw Bitmap to PNG",
+      "filePath": "src-tauri/src/lib.rs",
+      "summary": "Rust backend extracts RGBA buffer, encodes as PNG using image crate in memory, and returns Base64 data URI.",
+      "tags": ["step", "image", "png", "base64"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "step:synthesize-drag-drop-event",
+      "type": "step",
+      "name": "Synthesize & Dispatch Drop Event",
+      "filePath": "src-tauri/src/lib.rs",
+      "summary": "Fetches Base64 blob, creates File object, constructs DataTransfer, and dispatches synthetic DragEvent('drop') onto message input box.",
+      "tags": ["step", "dragevent", "drop", "dom"],
+      "complexity": "complex"
+    },
+    {
+      "id": "flow:async-clipboard-override",
+      "type": "flow",
+      "name": "Async Clipboard API Fallback Flow",
+      "filePath": "src-tauri/src/lib.rs",
+      "summary": "Wraps navigator.clipboard.read() to provide native Rust fallback when WebKitGTK async clipboard read fails.",
+      "tags": ["flow", "clipboard", "polyfill"],
+      "complexity": "moderate",
+      "domainMeta": {
+        "entryPoint": "navigator.clipboard.read()",
+        "entryType": "manual"
+      }
+    },
+    {
+      "id": "step:hook-clipboard-read",
+      "type": "step",
+      "name": "Patch navigator.clipboard.read",
+      "filePath": "src-tauri/src/lib.rs",
+      "summary": "Saves original read function and replaces it with error-catching wrapper.",
+      "tags": ["step", "monkeypatch", "clipboard"],
+      "complexity": "simple"
+    },
+    {
+      "id": "step:fallback-native-clipboard",
+      "type": "step",
+      "name": "Fallback to Native Clipboard Reader",
+      "filePath": "src-tauri/src/lib.rs",
+      "summary": "Calls clipboard_read_image_base64 or clipboard_read_text to retrieve data from native arboard backend.",
+      "tags": ["step", "fallback", "native"],
+      "complexity": "simple"
+    },
+    {
+      "id": "step:construct-clipboard-items",
+      "type": "step",
+      "name": "Construct ClipboardItem Array",
+      "filePath": "src-tauri/src/lib.rs",
+      "summary": "Wraps recovered text or image Blob into ClipboardItem instances and resolves Promise.",
+      "tags": ["step", "clipboard", "blob"],
+      "complexity": "simple"
+    },
+    {
+      "id": "flow:capability-enforcement",
+      "type": "flow",
+      "name": "Security Capability & ACL Enforcement Flow",
+      "filePath": "src-tauri/capabilities/default.json",
+      "summary": "Configures and verifies Tauri v2 capability definitions and remote origin permissions for WhatsApp Web.",
+      "tags": ["flow", "security", "acl", "origin"],
+      "complexity": "simple",
+      "domainMeta": {
+        "entryPoint": "src-tauri/capabilities/default.json",
+        "entryType": "manual"
+      }
+    },
+    {
+      "id": "step:match-remote-origin-whitelist",
+      "type": "step",
+      "name": "Validate Remote URL Whitelist",
+      "filePath": "src-tauri/capabilities/default.json",
+      "summary": "Ensures remote URLs are restricted to https://web.whatsapp.com/* and https://*.whatsapp.com/*.",
+      "tags": ["step", "whitelist", "security"],
+      "complexity": "simple"
+    },
+    {
+      "id": "step:grant-tauri-core-permissions",
+      "type": "step",
+      "name": "Grant Minimum Required Permissions",
+      "filePath": "src-tauri/capabilities/default.json",
+      "summary": "Allows core:default, core:webview:default, core:tray:default, and opener:default while blocking shell/fs access.",
+      "tags": ["step", "permissions", "acl"],
+      "complexity": "simple"
+    }
+  ],
+  "edges": [
+    {
+      "source": "domain:desktop-lifecycle",
+      "target": "flow:boot-and-memory-setup",
+      "type": "contains_flow",
+      "weight": 1.0,
+      "direction": "forward"
+    },
+    {
+      "source": "domain:desktop-lifecycle",
+      "target": "flow:minimize-to-tray",
+      "type": "contains_flow",
+      "weight": 1.0,
+      "direction": "forward"
+    },
+    {
+      "source": "flow:boot-and-memory-setup",
+      "target": "step:set-glibc-tunables",
+      "type": "flow_step",
+      "weight": 0.1,
+      "direction": "forward"
+    },
+    {
+      "source": "flow:boot-and-memory-setup",
+      "target": "step:build-tray-menu",
+      "type": "flow_step",
+      "weight": 0.2,
+      "direction": "forward"
+    },
+    {
+      "source": "flow:boot-and-memory-setup",
+      "target": "step:create-webview-window",
+      "type": "flow_step",
+      "weight": 0.3,
+      "direction": "forward"
+    },
+    {
+      "source": "flow:boot-and-memory-setup",
+      "target": "step:spawn-periodic-trim-thread",
+      "type": "flow_step",
+      "weight": 0.4,
+      "direction": "forward"
+    },
+    {
+      "source": "flow:minimize-to-tray",
+      "target": "step:intercept-close-request",
+      "type": "flow_step",
+      "weight": 0.1,
+      "direction": "forward"
+    },
+    {
+      "source": "flow:minimize-to-tray",
+      "target": "step:minimize-window-to-tray",
+      "type": "flow_step",
+      "weight": 0.2,
+      "direction": "forward"
+    },
+    {
+      "source": "flow:minimize-to-tray",
+      "target": "step:immediate-malloc-trim",
+      "type": "flow_step",
+      "weight": 0.3,
+      "direction": "forward"
+    },
+    {
+      "source": "flow:minimize-to-tray",
+      "target": "step:restore-window-from-tray",
+      "type": "flow_step",
+      "weight": 0.4,
+      "direction": "forward"
+    },
+    {
+      "source": "domain:notifications",
+      "target": "flow:incoming-message-alert",
+      "type": "contains_flow",
+      "weight": 1.0,
+      "direction": "forward"
+    },
+    {
+      "source": "domain:notifications",
+      "target": "flow:title-unread-detection",
+      "type": "contains_flow",
+      "weight": 1.0,
+      "direction": "forward"
+    },
+    {
+      "source": "flow:incoming-message-alert",
+      "target": "step:intercept-notification-constructor",
+      "type": "flow_step",
+      "weight": 0.1,
+      "direction": "forward"
+    },
+    {
+      "source": "flow:incoming-message-alert",
+      "target": "step:debounce-notification",
+      "type": "flow_step",
+      "weight": 0.2,
+      "direction": "forward"
+    },
+    {
+      "source": "flow:incoming-message-alert",
+      "target": "step:invoke-tauri-notify-command",
+      "type": "flow_step",
+      "weight": 0.3,
+      "direction": "forward"
+    },
+    {
+      "source": "flow:incoming-message-alert",
+      "target": "step:spawn-notify-send-subprocess",
+      "type": "flow_step",
+      "weight": 0.4,
+      "direction": "forward"
+    },
+    {
+      "source": "flow:title-unread-detection",
+      "target": "step:poll-document-title",
+      "type": "flow_step",
+      "weight": 0.1,
+      "direction": "forward"
+    },
+    {
+      "source": "flow:title-unread-detection",
+      "target": "step:regex-extract-unread-count",
+      "type": "flow_step",
+      "weight": 0.2,
+      "direction": "forward"
+    },
+    {
+      "source": "flow:title-unread-detection",
+      "target": "step:trigger-badge-alert",
+      "type": "flow_step",
+      "weight": 0.3,
+      "direction": "forward"
+    },
+    {
+      "source": "domain:clipboard-media",
+      "target": "flow:image-paste-bridge",
+      "type": "contains_flow",
+      "weight": 1.0,
+      "direction": "forward"
+    },
+    {
+      "source": "domain:clipboard-media",
+      "target": "flow:async-clipboard-override",
+      "type": "contains_flow",
+      "weight": 1.0,
+      "direction": "forward"
+    },
+    {
+      "source": "flow:image-paste-bridge",
+      "target": "step:intercept-paste-capture",
+      "type": "flow_step",
+      "weight": 0.1,
+      "direction": "forward"
+    },
+    {
+      "source": "flow:image-paste-bridge",
+      "target": "step:query-native-clipboard-image",
+      "type": "flow_step",
+      "weight": 0.2,
+      "direction": "forward"
+    },
+    {
+      "source": "flow:image-paste-bridge",
+      "target": "step:encode-png-in-memory",
+      "type": "flow_step",
+      "weight": 0.3,
+      "direction": "forward"
+    },
+    {
+      "source": "flow:image-paste-bridge",
+      "target": "step:synthesize-drag-drop-event",
+      "type": "flow_step",
+      "weight": 0.4,
+      "direction": "forward"
+    },
+    {
+      "source": "flow:async-clipboard-override",
+      "target": "step:hook-clipboard-read",
+      "type": "flow_step",
+      "weight": 0.1,
+      "direction": "forward"
+    },
+    {
+      "source": "flow:async-clipboard-override",
+      "target": "step:fallback-native-clipboard",
+      "type": "flow_step",
+      "weight": 0.2,
+      "direction": "forward"
+    },
+    {
+      "source": "flow:async-clipboard-override",
+      "target": "step:construct-clipboard-items",
+      "type": "flow_step",
+      "weight": 0.3,
+      "direction": "forward"
+    },
+    {
+      "source": "domain:security-capabilities",
+      "target": "flow:capability-enforcement",
+      "type": "contains_flow",
+      "weight": 1.0,
+      "direction": "forward"
+    },
+    {
+      "source": "flow:capability-enforcement",
+      "target": "step:match-remote-origin-whitelist",
+      "type": "flow_step",
+      "weight": 0.1,
+      "direction": "forward"
+    },
+    {
+      "source": "flow:capability-enforcement",
+      "target": "step:grant-tauri-core-permissions",
+      "type": "flow_step",
+      "weight": 0.2,
+      "direction": "forward"
+    },
+    {
+      "source": "domain:desktop-lifecycle",
+      "target": "domain:notifications",
+      "type": "cross_domain",
+      "weight": 0.5,
+      "direction": "forward",
+      "description": "Desktop tray coordinates alert state and window minimization"
+    },
+    {
+      "source": "domain:notifications",
+      "target": "domain:security-capabilities",
+      "type": "cross_domain",
+      "weight": 0.5,
+      "direction": "forward",
+      "description": "Notification IPC commands authenticated by Tauri ACL"
+    },
+    {
+      "source": "domain:clipboard-media",
+      "target": "domain:security-capabilities",
+      "type": "cross_domain",
+      "weight": 0.5,
+      "direction": "forward",
+      "description": "Clipboard native commands permitted for remote origin"
+    },
+    {
+      "source": "domain:clipboard-media",
+      "target": "domain:desktop-lifecycle",
+      "type": "cross_domain",
+      "weight": 0.5,
+      "direction": "forward",
+      "description": "Image PNG buffers reclaimed by periodic malloc_trim"
+    }
+  ],
+  "layers": [
+    {
+      "id": "layer:desktop-runtime-domain",
+      "name": "Desktop Runtime Domain",
+      "description": "Core process management, window state, and memory stabilization",
+      "nodeIds": [
+        "domain:desktop-lifecycle",
+        "flow:boot-and-memory-setup",
+        "flow:minimize-to-tray"
+      ]
+    },
+    {
+      "id": "layer:messaging-notification-domain",
+      "name": "Messaging & Alerts Domain",
+      "description": "WhatsApp notification bridging and title unread badge polling",
+      "nodeIds": [
+        "domain:notifications",
+        "flow:incoming-message-alert",
+        "flow:title-unread-detection"
+      ]
+    },
+    {
+      "id": "layer:clipboard-media-domain",
+      "name": "Clipboard & Media Domain",
+      "description": "WebKitGTK paste interception and native image encoding",
+      "nodeIds": [
+        "domain:clipboard-media",
+        "flow:image-paste-bridge",
+        "flow:async-clipboard-override"
+      ]
+    },
+    {
+      "id": "layer:security-domain",
+      "name": "Security & Capabilities Domain",
+      "description": "Tauri v2 ACL policies and origin isolation",
+      "nodeIds": [
+        "domain:security-capabilities",
+        "flow:capability-enforcement"
+      ]
+    }
+  ],
+  "tour": [
+    {
+      "order": 1,
+      "title": "Desktop Lifecycle & Memory Domain",
+      "description": "Explore how the Linux desktop process boots with glibc tunables, integrates with system tray, and handles minimize-to-tray memory reclamation.",
+      "nodeIds": ["domain:desktop-lifecycle", "flow:boot-and-memory-setup", "flow:minimize-to-tray"]
+    },
+    {
+      "order": 2,
+      "title": "Notifications & Alerts Domain",
+      "description": "Understand how web notification events and title badges are converted into native notify-send alerts.",
+      "nodeIds": ["domain:notifications", "flow:incoming-message-alert", "flow:title-unread-detection"]
+    },
+    {
+      "order": 3,
+      "title": "Clipboard & Media Bridge Domain",
+      "description": "Follow the capture-phase paste interception, native image encoding, and synthetic drop event pipeline.",
+      "nodeIds": ["domain:clipboard-media", "flow:image-paste-bridge"]
+    },
+    {
+      "order": 4,
+      "title": "Security Capabilities Domain",
+      "description": "Review the Tauri v2 ACL boundaries enforcing origin restrictions on web.whatsapp.com.",
+      "nodeIds": ["domain:security-capabilities", "flow:capability-enforcement"]
+    }
+  ]
+}
